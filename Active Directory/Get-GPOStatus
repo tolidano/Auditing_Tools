@@ -102,5 +102,5 @@ $report |
  Select-Object @{name='SOM';expression={$_.name.PadLeft($_.name.length + ($_.depth * 5),'_')}}, `
   DistinguishedName, BlockInheritance, LinkEnabled, Enforced, Precedence, `
   DisplayName, GPOStatus, WMIFilter, GUID, PolicyDN |
- Export-CSV .\gPLink_Report.csv -NoTypeInformation
+ Export-CSV .\GPO_Status_Report.csv -NoTypeInformation
 
