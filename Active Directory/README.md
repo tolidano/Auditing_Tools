@@ -24,19 +24,20 @@ This script gives out informations on where the GPO resides, it's status etc int
 
 Other One Liner commands
 ------------------------
+
 1. Extract all GPO Reports to one html file
 
-Get-GPOReport -All -Reporttype html | Out-File <Path_of_the_Output_File>
+   Get-GPOReport -All -Reporttype html | Out-File <Path_of_the_Output_File>
 
 2. Extract all AD Objects from the domain  with attributes
 
-i. csvde -f output.csv (Outputs the entire AD Objects with all the properties/ attributes to a csv file, heavy on AD Server)
+   i. csvde -f output.csv (Outputs the entire AD Objects with all the properties/ attributes to a csv file, heavy on AD Server)
 
-ii. dsquery * domainroot -attr samaccountname samaccounttype description useraccountcontrol whenCreated whenchanged accountexpires lastlogon lastlogontimestamp lastlogoff memberof –limit 0 > Userlist.txt (Outputs the entire AD Objects to a csv file, heavy on AD Server)
+   ii. dsquery * domainroot -attr samaccountname samaccounttype description useraccountcontrol whenCreated whenchanged accountexpires lastlogon lastlogontimestamp lastlogoff memberof –limit 0 > Userlist.txt (Outputs the entire AD Objects to a csv file, heavy on AD Server)
 
-Note:- 
-There are many attributes that can be used with the above command. Find the list of supported attributes in the below link :-
-https://pastebin.com/mYD1Qk0L
+   Note:- 
+        There are many attributes that can be used with the above command. Find the list of supported attributes in the below link :-
+        https://pastebin.com/mYD1Qk0L
 
 
 
