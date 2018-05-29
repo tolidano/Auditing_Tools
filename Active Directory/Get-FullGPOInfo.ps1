@@ -103,7 +103,7 @@ Function Get-GPOInfo {
                 'Config'             = $report[$index].Config
                 'LinkEnabled'        = $report[$index].LinkEnabled
                 'Enforced'           = $report[$index].Enforced
-                'BlockInheritance'   = $report[1].BlockInheritance
+                'BlockInheritance'   = $report[$index].BlockInheritance
                 'SOM'                = $sm
                 'LinksTO'            = $XmlGPReport.GPO.LinksTo | Select-Object -ExpandProperty SOMPath 
                 'Name'               = $XmlGPReport.GPO.Name 
