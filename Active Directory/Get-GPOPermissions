@@ -1,9 +1,0 @@
-Import-Module GroupPolicy
-$gpo = Get-GPO -All
-$domain= Get-ADDomain
-$GPO |  ForEach-Object {
-$adgpo = [ADSI]"LDAP://CN=`{$($_.Id.guid)`},CN=Policies,CN=System,$domain"
-$acl = $adgpo.ObjectSecurity
-$_.DisplayName
-$acl.Access
-}
