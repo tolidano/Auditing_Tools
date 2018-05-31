@@ -1,4 +1,4 @@
-This folder consists of scripts that are used by me to audit Active Direectory related controls.
+This folder consists of scripts that are used by me to audit Active Directory related controls.
 
 
 Disclaimer : 
