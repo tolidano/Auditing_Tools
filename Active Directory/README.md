@@ -1,42 +1,38 @@
-Most of the scripts here are not written by me and has been collated and uploaded here from various online sources for easy reference and use.
-Original source links has been given wherever applicable.
+This folder consists of scripts that are used by me to audit Active Direectory related controls.
 
-Get-GPOInfo 
------------
-Source : https://gallery.technet.microsoft.com/scriptcenter/Get-GPO-informations-b02e0fdf
 
-This powershell script helps extracting all the information relating to a GPO such as created date, modified date etc. from the Active Directory Server.
+Disclaimer : 
+------------
 
-Get-GPOPermissions 
-------------------
+Most of the scripts here are not written by me and has been collated and uploaded here from various online sources for easy reference and use. Original source links has been given wherever applicable.
 
-Custom written powershell script with help of various online sources.
-This powershell script extracts all permissions of Group Policy. These permissions are given out in GUID format. Majorly helps in identifying in case any specific object has been exempted from following a policy. 
+Get-FullGPOInfo 
+---------------
+This script extracts all the Metadata of all existing GPOs in a domain controller.
 
-Note: 
-GUID for "Apply Group Policy" permission is "edacfd8f-ffb3-11d1-b41d-00a0c968f939". Check for "Deny" Value  for the GUID to confirm if a specific AD Object has been exempted from following the GPO.
+This script consists of codes from various online sources with little bit of customisations from my side for personal use. The original source of the scripts utilised in this , has been given below.
 
-Get-GPOStatus 
--------------
-Source: https://gallery.technet.microsoft.com/PowerShell-Script-to-eed7188a
+Source : 
+1. https://gallery.technet.microsoft.com/scriptcenter/Get-GPO-informations-b02e0fdf
+2. https://gallery.technet.microsoft.com/PowerShell-Script-to-eed7188a
 
-This script gives out informations on where the GPO resides, it's status etc into a csv file in the same directory from where the script is run. The hardcoded name of the output csv file is "GPO_Status_Report.csv".
 
-Other One Liner commands
-------------------------
+Quick Reference One-Liner Commands
+----------------------------------
+Note: This section will be updated as and when I find any one liner commands being useful in my audit journey.
 
-1. Extract all GPO Reports to one html file
+1. Extract all GPO Reports to one html/xml file
 
-   Get-GPOReport -All -Reporttype html | Out-File <Path_of_the_Output_File>
+   Get-GPOReport -All -Reporttype < html / XML> | Out-File <Path_of_the_Output_File>
 
-2. Extract all AD Objects from the domain  with attributes
+2. Extract all AD Objects from the root domain with attributes
 
    i. csvde -f output.csv (Outputs the entire AD Objects with all the properties/ attributes to a csv file, heavy on AD Server)
 
    ii. dsquery * domainroot -attr samaccountname samaccounttype description useraccountcontrol whenCreated whenchanged accountexpires lastlogon lastlogontimestamp lastlogoff memberof –limit 0 > Userlist.txt (Outputs the entire AD Objects to a csv file, heavy on AD Server)
 
    Note:- 
-        There are many attributes that can be used with the above command. Find the list of supported attributes in the below link :-
+        There are many attributes that can be used with the above dsquery command. Find the list of supported attributes in the below link :-
         https://pastebin.com/mYD1Qk0L
 
 
