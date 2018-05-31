@@ -1,4 +1,4 @@
-Function Get-GPOInfo { 
+Function Get-FullGPOInfo { 
     [cmdletbinding()] 
     Param( 
         [Parameter(Mandatory=$false)] 
@@ -34,22 +34,25 @@ Function Get-GPOInfo {
         Select-Object name, distinguishedName, gPLink, gPOptions, @{name='Depth';expression={0}}
         
 		$report = @()
-        
+        $order=0
 		ForEach ($SOM in $gPLinks) {
 			If ($SOM.gPLink) {
+                    $order+=1
 					If ($SOM.gPLink.length -gt 1) {
 						$links = @($SOM.gPLink -split {$_ -eq '[' -or $_ -eq ']'} | Where-Object {$_}) 
 						For ( $i = $links.count - 1 ; $i -ge 0 ; $i-- ) {
 							$GPOData = $links[$i] -split {$_ -eq '/' -or $_ -eq ';'}
 							$report += New-Object -TypeName PSCustomObject -Property @{
 							Name              = $SOM.Name;
+                            DistinguishedName = $SOM.distinguishedName
                             GUID              = "{$($GPOsHash[$($GPOData[2])].ID)}";
 							Depth             = $SOM.Depth;
-							Precedence        = $links.count - $i
+                            Order             = $order
+							Precedence        = $links.count - $i #Depends on where it is
 							Config            = $GPOData[3];
-							LinkEnabled       = [bool](!([int]$GPOData[3] -band 1));
-							Enforced          = [bool]([int]$GPOData[3] -band 2);
-							BlockInheritance  = [bool]($SOM.gPOptions -band 1)
+							LinkEnabled       = [bool](!([int]$GPOData[3] -band 1)); #Depends on where it is
+							Enforced          = [bool]([int]$GPOData[3] -band 2); #Depends on where it is 
+							BlockInheritance  = [bool]($SOM.gPOptions -band 1)    #Depends on OU where it is placed
 							} 
 						}
 					} 
@@ -71,9 +74,19 @@ Function Get-GPOInfo {
         
         
         $domain= Get-ADDomain
-        ForEach($GPO in (Get-GPO -All -Domain $DomainName )){ 
+        ForEach ($path in $gpLinks)
+		{
+
+            $gpinheritance=(Get-GPInheritance -path $path.distinguishedname).gpolinks
+
+        ForEach($GP in $gpinheritance){ 
+			
             Write-Verbose -Message "Processing $($GPO.DisplayName)..." 
-            [xml]$XmlGPReport = $GPO.generatereport('xml') 
+            
+            ForEach ($guid in $GP){
+			
+            [xml]$XmlGPReport = Get-GPOReport -Guid $Guid.gpoid -ReportType xml
+			$GPO = Get-GPO -guid $Guid.gpoid
             #GPO version 
             if($XmlGPReport.GPO.Computer.VersionDirectory -eq 0 -and $XmlGPReport.GPO.Computer.VersionSysvol -eq 0){$ComputerSettings="NeverModified"}else{$ComputerSettings="Modified"} 
             if($XmlGPReport.GPO.User.VersionDirectory -eq 0 -and $XmlGPReport.GPO.User.VersionSysvol -eq 0){$UserSettings="NeverModified"}else{$UserSettings="Modified"} 
@@ -83,27 +96,38 @@ Function Get-GPOInfo {
             #Output 
             $adgpo = [ADSI]"LDAP://CN=`{$($GPO.id)`},CN=Policies,CN=System,$domain"
             $acl = $adgpo.ObjectSecurity
-            $index=-1
+            $guidindex=-1
+            $ouindex=-1
             
             For ( $i = 0;$i -le $report.count;$i++ ) 
             {
                      
-               if((($report[$i].Guid.tostring() -replace "{","") -replace "}","") -eq $GPO.ID)
+               if(((($report[$i].Guid.tostring() -replace "{","") -replace "}","") -eq $Guid.gpoid ) -and ($guidindex -eq -1))
                {
-                  $index=$i
-                  break
+                  $guidindex=$i
+                                 
                }
+
+               if (($report[$i].distinguishedname  -eq $path.distinguishedname ) -and ($ouindex -eq -1))
+               {
+                  $ouindex=$i
+                  
+               }
+
+               if ($guidindex -ne -1 -and $ouindex -ne -1){
+               break}
+
              }
-            $sm=  $report[$index].Name.PadLeft($report[$index].name.length + ($report[$index].depth * 5),'_')             
+            $sm=  $report[$ouindex].Name.PadLeft($report[$ouindex].name.length + ($report[$ouindex].depth * 5),'_')             
             
             New-Object -TypeName PSObject -Property @{ 
                 
-                'Depth'              = $report[$index].Depth
-                'Precedence'         = $report[$index].Precedence
-                'Config'             = $report[$index].Config
-                'LinkEnabled'        = $report[$index].LinkEnabled
-                'Enforced'           = $report[$index].Enforced
-                'BlockInheritance'   = $report[$index].BlockInheritance
+                'Depth'              = $report[$ouindex].Depth
+                'Precedence'         = $guid.order
+                'Order'              = $report[$ouindex].order                
+                'LinkEnabled'        = $guid.Enabled
+                'Enforced'           = $guid.Enforced
+                'BlockInheritance'   = $report[$ouindex].BlockInheritance
                 'SOM'                = $sm
                 'LinksTO'            = $XmlGPReport.GPO.LinksTo | Select-Object -ExpandProperty SOMPath 
                 'Name'               = $XmlGPReport.GPO.Name 
@@ -119,7 +143,8 @@ Function Get-GPOInfo {
                 'GpoStatus'          = $GPO.GpoStatus 
                 'GUID'               = $GPO.Id 
                 'WMIFilter'          = $GPO.WmiFilter.name,$GPO.WmiFilter.Description 
-                'Path'               = $GPO.Path 
+                'GPOPath'            = $GPO.Path 
+                'SOMPath'               = $path.distinguishedname
                 'Permissions'        = $acl.Access | ForEach-Object -Process { 
                     New-Object -TypeName PSObject -Property @{ 
                         'ActiveDirectory Rights'  = $_.ActiveDirectoryRights
@@ -136,8 +161,8 @@ Function Get-GPOInfo {
                     } 
                 } 
             } 
-        } 
+        } }
     } 
  
-}
-Get-GPOInfo
+}}
+Get-FullGpoinfo | Select-Object SOM,SOMpath,Order,Depth,Name,GUID,GPOpath,LinkEnabled,Enforced,Precedence,BlockInheritance,Linksto,CreationTime,ModificationTime,GPOStatus,HasComputerSettings,ComputerSettings,ComputerEnabled,HasUserSettings,UserSettings,UserEnabled,Wmifilter,Permissions,SDDL| Sort-Object Order,Precedence
