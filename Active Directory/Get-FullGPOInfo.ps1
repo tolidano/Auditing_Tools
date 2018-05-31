@@ -17,7 +17,34 @@ Function Get-FullGPOInfo {
     } 
  
     Process{ 
+
+###############################################################################################
+
+		Function Get-ADOrganizationalUnitOneLevel {
+		param($Path)
+			Get-ADOrganizationalUnit -Filter * -SearchBase $Path `
+				-SearchScope OneLevel -Server $Server |
+				Sort-Object Name |
+				ForEach-Object {
+					$script:OUHash.Add($_.DistinguishedName,$script:Counter++)
+					Get-ADOrganizationalUnitOneLevel -Path $_.DistinguishedName}
+		}
+
+		Function Get-ADOrganizationalUnitSorted {
+			$DomainRoot = (Get-ADDomain -Server $Server).DistinguishedName
+			$script:Counter = 1
+			$script:OUHash = @{$DomainRoot=0}
+			Get-ADOrganizationalUnitOneLevel -Path $DomainRoot
+			$OUHash
+		}
+
+		$SortedOUs = Get-ADOrganizationalUnitSorted
         
+
+#################################################################################################
+
+
+
         $GPOs = Get-GPO -All | Select-Object ID, Path, DisplayName, GPOStatus, WMIFilter
         $GPOsHash = @{}
         ForEach ($GPO in $GPOs) 
@@ -34,7 +61,7 @@ Function Get-FullGPOInfo {
         Select-Object name, distinguishedName, gPLink, gPOptions, @{name='Depth';expression={0}}
         
 		$report = @()
-        $order=0
+        
 		ForEach ($SOM in $gPLinks) {
 			If ($SOM.gPLink) {
                     $order+=1
@@ -45,10 +72,9 @@ Function Get-FullGPOInfo {
 							$report += New-Object -TypeName PSCustomObject -Property @{
 							Name              = $SOM.Name;
                             DistinguishedName = $SOM.distinguishedName
-                            GUID              = "{$($GPOsHash[$($GPOData[2])].ID)}";
+                            GUID              = $($GPOsHash[$($GPOData[2])].ID);
 							Depth             = $SOM.Depth;
-                            Order             = $order
-							Precedence        = $links.count - $i #Depends on where it is
+                            Precedence        = $links.count - $i #Depends on where it is
 							Config            = $GPOData[3];
 							LinkEnabled       = [bool](!([int]$GPOData[3] -band 1)); #Depends on where it is
 							Enforced          = [bool]([int]$GPOData[3] -band 2); #Depends on where it is 
@@ -58,7 +84,9 @@ Function Get-FullGPOInfo {
 					} 
 					Else {
 						$report += New-Object -TypeName PSCustomObject -Property @{
-						Depth             = $SOM.Depth;
+                        Depth             = $SOM.Depth;
+                        Name              = $SOM.Name;
+                        DistinguishedName = $SOM.distinguishedName;
 						BlockInheritance  = [bool]($SOM.gPOptions -band 1)
 						}
 					}
@@ -66,43 +94,25 @@ Function Get-FullGPOInfo {
 		   Else {
             $report += New-Object -TypeName PSCustomObject -Property @{
             Depth             = $SOM.Depth;
+            Name              = $SOM.Name;
+            DistinguishedName = $SOM.distinguishedName;
             BlockInheritance  = [bool]($SOM.gPOptions -band 1)
 				}
 			} 
 		}
         
-        
+########################################################################################################################################################       
         
         $domain= Get-ADDomain
         ForEach ($path in $gpLinks)
 		{
-
-            $gpinheritance=(Get-GPInheritance -path $path.distinguishedname).gpolinks
-
-        ForEach($GP in $gpinheritance){ 
-			
-            Write-Verbose -Message "Processing $($GPO.DisplayName)..." 
-            
-            ForEach ($guid in $GP){
-			
-            [xml]$XmlGPReport = Get-GPOReport -Guid $Guid.gpoid -ReportType xml
-			$GPO = Get-GPO -guid $Guid.gpoid
-            #GPO version 
-            if($XmlGPReport.GPO.Computer.VersionDirectory -eq 0 -and $XmlGPReport.GPO.Computer.VersionSysvol -eq 0){$ComputerSettings="NeverModified"}else{$ComputerSettings="Modified"} 
-            if($XmlGPReport.GPO.User.VersionDirectory -eq 0 -and $XmlGPReport.GPO.User.VersionSysvol -eq 0){$UserSettings="NeverModified"}else{$UserSettings="Modified"} 
-            #GPO content 
-            if($XmlGPReport.GPO.User.ExtensionData -eq $null){$UserSettingsConfigured=$false}else{$UserSettingsConfigured=$true} 
-            if($XmlGPReport.GPO.Computer.ExtensionData -eq $null){$ComputerSettingsConfigured=$false}else{$ComputerSettingsConfigured=$true} 
-            #Output 
-            $adgpo = [ADSI]"LDAP://CN=`{$($GPO.id)`},CN=Policies,CN=System,$domain"
-            $acl = $adgpo.ObjectSecurity
             $guidindex=-1
             $ouindex=-1
             
             For ( $i = 0;$i -le $report.count;$i++ ) 
             {
                      
-               if(((($report[$i].Guid.tostring() -replace "{","") -replace "}","") -eq $Guid.gpoid ) -and ($guidindex -eq -1))
+               if(($report[$i].Guid -eq $Guid.gpoid ) -and ($guidindex -eq -1))
                {
                   $guidindex=$i
                                  
@@ -120,11 +130,50 @@ Function Get-FullGPOInfo {
              }
             $sm=  $report[$ouindex].Name.PadLeft($report[$ouindex].name.length + ($report[$ouindex].depth * 5),'_')             
             
-            New-Object -TypeName PSObject -Property @{ 
+
+            $gpinheritance=(Get-GPInheritance -path $path.distinguishedname).gpolinks
+			if ($gpinheritance -ne {}){
+        ForEach($GP in $gpinheritance){ 
+			
+            Write-Verbose -Message "Processing $($GPO.DisplayName)..." 
+            
+            ForEach ($guid in $GP){
+			
+            [xml]$XmlGPReport = Get-GPOReport -Guid $Guid.gpoid -ReportType xml
+			$GPO = Get-GPO -guid $Guid.gpoid
+            #GPO version 
+            if($XmlGPReport.GPO.Computer.VersionDirectory -eq 0 -and $XmlGPReport.GPO.Computer.VersionSysvol -eq 0){$ComputerSettings="NeverModified"}else{$ComputerSettings="Modified"} 
+            if($XmlGPReport.GPO.User.VersionDirectory -eq 0 -and $XmlGPReportG.GPO.User.VersionSysvol -eq 0){$UserSettings="NeverModified"}else{$UserSettings="Modified"} 
+            #GPO content 
+            if($XmlGPReport.GPO.User.ExtensionData -eq $null){$UserSettingsConfigured=$false}else{$UserSettingsConfigured=$true} 
+            if($XmlGPReport.GPO.Computer.ExtensionData -eq $null){$ComputerSettingsConfigured=$false}else{$ComputerSettingsConfigured=$true} 
+            #Output 
+            $adgpo = [ADSI]"LDAP://CN=`{$($GPO.id)`},CN=Policies,CN=System,$domain"
+            $acl = $adgpo.ObjectSecurity
+            $sacl = (Get-ACL -Audit -Path "AD:\$($GPO.path)").Audit
+            
+			New-Object -TypeName PSObject -Property @{ 
                 
                 'Depth'              = $report[$ouindex].Depth
+                'Description'        = $GPO.Description
                 'Precedence'         = $guid.order
-                'Order'              = $report[$ouindex].order                
+                'SACL'               = $sacl | ForEach-Object -Process { 
+                    New-Object -TypeName PSObject -Property @{ 
+                        'ActiveDirectory Rights'  = $_.ActiveDirectoryRights
+                        'Inheritance Type'        = $_.InheritanceType
+                        'Object Type'             = $_.ObjectType
+                        'Inherited ObjectType'    = $_.InheritedObjectType
+                        'Object Flags'            = $_.ObjectFlags
+                        'Audit Flags'             = $_.AuditFlags
+                        'Access Control Type'     = $_.AccessControlType
+                        'Identity Reference'      = $_.Identityreference
+                        'Is Inherited'            = $_.Isinherited
+                        'Inheritance Flags'       = $_.InheritanceFlags
+                        'Propogation Flags'       = $_.Propogationflags
+
+                    } 
+                    }
+                'SortOrder'          = $sortedous[$path.distinguishedname]               
                 'LinkEnabled'        = $guid.Enabled
                 'Enforced'           = $guid.Enforced
                 'BlockInheritance'   = $report[$ouindex].BlockInheritance
@@ -144,7 +193,7 @@ Function Get-FullGPOInfo {
                 'GUID'               = $GPO.Id 
                 'WMIFilter'          = $GPO.WmiFilter.name,$GPO.WmiFilter.Description 
                 'GPOPath'            = $GPO.Path 
-                'SOMPath'               = $path.distinguishedname
+                'SOMPath'            = $path.distinguishedname
                 'Permissions'        = $acl.Access | ForEach-Object -Process { 
                     New-Object -TypeName PSObject -Property @{ 
                         'ActiveDirectory Rights'  = $_.ActiveDirectoryRights
@@ -160,9 +209,47 @@ Function Get-FullGPOInfo {
 
                     } 
                 } 
-            } 
+            }
+             
         } }
+		}#
+		
+		else 
+		
+		{
+		
+			New-Object -TypeName PSObject -Property @{ 
+                
+                'Depth'              = $report[$ouindex].Depth
+                'Precedence'         = ""
+                'SortOrder'           =$sortedous[$path.distinguishedname]               
+                'LinkEnabled'        = ""
+                'SACL'               = ""
+                'Enforced'           = ""
+                'BlockInheritance'   = $report[$ouindex].BlockInheritance
+                'SOM'                = $sm
+                'LinksTO'            = "" 
+                'Name'               = "" 
+                'ComputerSettings'   = "" 
+                'UserSettings'       = "" 
+                'SDDL'               = ""
+                'UserEnabled'        = "" 
+                'ComputerEnabled'    = "" 
+                'HasComputerSettings'= "" 
+                'HasUserSettings'    = "" 
+                'CreationTime'       = "" 
+                'ModificationTime'   = "" 
+                'GpoStatus'          = "" 
+                'GUID'               = "" 
+                'WMIFilter'          = "" 
+                'GPOPath'            = "" 
+                'SOMPath'            = $path.distinguishedname
+                'Permissions'        = "" 
+            }
+			
+						
+		}#
     } 
  
 }}
-Get-FullGpoinfo | Select-Object SOM,SOMpath,Order,Depth,Name,GUID,GPOpath,LinkEnabled,Enforced,Precedence,BlockInheritance,Linksto,CreationTime,ModificationTime,GPOStatus,HasComputerSettings,ComputerSettings,ComputerEnabled,HasUserSettings,UserSettings,UserEnabled,Wmifilter,Permissions,SDDL| Sort-Object Order,Precedence
+Get-FullGpoinfo | Select-Object SOM,SOMpath,SortOrder,Depth,Name,GUID,GPOpath,LinkEnabled,Enforced,Precedence,BlockInheritance,Linksto,CreationTime,ModificationTime,GPOStatus,HasComputerSettings,ComputerSettings,ComputerEnabled,HasUserSettings,UserSettings,UserEnabled,Wmifilter,Permissions,SDDL,SACL| Sort-Object SortOrder,Precedence | Out-GridView
