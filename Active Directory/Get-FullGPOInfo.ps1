@@ -3,10 +3,21 @@
 
 Requires:
 -PowerShell v3 or above
--RSAT 2012 or above for GPLinkMetadata (If not , it will throw a couple of errors when processing 
+-RSAT 2012 or above for GPLinkMetadata details to work (If not , it will throw a couple of errors, Ignore )
 -AD PowerShell module
 -Group Policy module
 -Appropriate permissions
+
+Github Link: https://github.com/rams3sh/Auditing_Tools/blob/master/Active%20Directory/Get-FullGPOInfo.ps1
+
+This script extracts all the Metadata of all existing GPOs in a domain controller.
+This script consists of codes from various online sources with little bit of customizations from my side for personal use. The original source of the scripts utilised in this , has been given below.
+Big thanks to AshleyMcGlone. This script is a major rip-off from his scripts related to GPOs.
+
+Source :
+    https://gallery.technet.microsoft.com/scriptcenter/Get-GPO-informations-b02e0fdf
+    https://gallery.technet.microsoft.com/PowerShell-Script-to-eed7188a
+    https://gallery.technet.microsoft.com/Forensics-Audit-Group-f9c57a1d
 
 #####################################################################################################################################################################################################################################################>
 
