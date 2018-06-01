@@ -3,21 +3,10 @@
 
 Requires:
 -PowerShell v3 or above
--RSAT 2012 or above for GPLinkMetadata details to work (If not , it will throw a couple of errors, Ignore )
+-RSAT 2012 or above for GPLinkMetadata (If not , it will throw a couple of errors when processing 
 -AD PowerShell module
 -Group Policy module
 -Appropriate permissions
-
-Github Link: https://github.com/rams3sh/Auditing_Tools/blob/master/Active%20Directory/Get-FullGPOInfo.ps1
-
-This script extracts all the Metadata of all existing GPOs in a domain controller.
-This script consists of codes from various online sources with little bit of customizations from my side for personal use. The original source of the scripts utilised in this , has been given below.
-Big thanks to AshleyMcGlone. This script is a major rip-off from his scripts related to GPOs.
-
-Source :
-    https://gallery.technet.microsoft.com/scriptcenter/Get-GPO-informations-b02e0fdf
-    https://gallery.technet.microsoft.com/PowerShell-Script-to-eed7188a
-    https://gallery.technet.microsoft.com/Forensics-Audit-Group-f9c57a1d
 
 #####################################################################################################################################################################################################################################################>
 
@@ -213,6 +202,8 @@ Function Get-FullGPOInfo {
                 'Name'               = $XmlGPReport.GPO.Name 
                 'ComputerSettings'   = $ComputerSettings 
                 'UserSettings'       = $UserSettings 
+                'UserVersion'        = "DSVersion: $($GPO.User.DSVersion);SysVolVersion: $($GPO.User.SysVolVersion)"
+                'ComputerVersion'    = "DSVersion: $($GPO.Computer.DSVersion);SysVolVersion: $($GPO.Computer.SysVolVersion)"
                 'SDDL'               = $XmlGPReport.GPO.SecurityDescriptor.SDDL.'#text'
                 'UserEnabled'        = $XmlGPReport.GPO.User.Enabled 
                 'ComputerEnabled'    = $XmlGPReport.GPO.Computer.Enabled 
@@ -269,6 +260,8 @@ Function Get-FullGPOInfo {
                 'UserSettings'       = "" 
                 'SDDL'               = ""
                 'UserEnabled'        = "" 
+                'UserVersion'        = ""
+                'ComputerVersion'    = ""
                 'ComputerEnabled'    = "" 
                 'HasComputerSettings'= "" 
                 'HasUserSettings'    = "" 
@@ -291,5 +284,5 @@ Function Get-FullGPOInfo {
     } 
  
 }}
-Get-FullGpoinfo | Select-Object SOM,SOMpath,SortOrder,Depth,Name,GUID,GPOpath,LinkEnabled,Enforced,Precedence,BlockInheritance,Linksto,CreationTime,ModificationTime,GPOStatus,HasComputerSettings,ComputerSettings,ComputerEnabled,HasUserSettings,UserSettings,UserEnabled,Wmifilter,gPLinkVersion,gPLinkLastOrigChgTime,gPLinkLastOrigChgDirServerId,gPLinkLastOrigChgDirServerInvocId,Permissions,SDDL,SACL| Sort-Object SortOrder,Precedence | Out-GridView
+Get-FullGpoinfo | Select-Object SOM,SOMpath,SortOrder,Depth,Name,GUID,GPOpath,LinkEnabled,Enforced,Precedence,BlockInheritance,Linksto,CreationTime,ModificationTime,GPOStatus,HasComputerSettings,ComputerSettings,ComputerEnabled,ComputerVersion,HasUserSettings,UserSettings,UserEnabled,UserVersion,Wmifilter,gPLinkVersion,gPLinkLastOrigChgTime,gPLinkLastOrigChgDirServerId,gPLinkLastOrigChgDirServerInvocId,Permissions,SDDL,SACL| Sort-Object SortOrder,Precedence | Out-GridView
 
