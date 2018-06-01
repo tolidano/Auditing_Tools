@@ -1,3 +1,15 @@
+<####################################################################################################################################################################################################################################################
+
+
+Requires:
+-PowerShell v3 or above
+-RSAT 2012 or above for GPLinkMetadata (If not , it will throw a couple of errors when processing 
+-AD PowerShell module
+-Group Policy module
+-Appropriate permissions
+
+#####################################################################################################################################################################################################################################################>
+
 Function Get-FullGPOInfo { 
     [cmdletbinding()] 
     Param( 
@@ -18,7 +30,7 @@ Function Get-FullGPOInfo {
  
     Process{ 
 
-###############################################################################################
+########################################################################################################################################################################################################################################################
 
 		Function Get-ADOrganizationalUnitOneLevel {
 		param($Path)
@@ -41,7 +53,7 @@ Function Get-FullGPOInfo {
 		$SortedOUs = Get-ADOrganizationalUnitSorted
         
 
-#################################################################################################
+##########################################################################################################################################################################################################################################################
 
 
 
@@ -64,6 +76,10 @@ Function Get-FullGPOInfo {
         
 		ForEach ($SOM in $gPLinks) {
 			If ($SOM.gPLink) {
+
+            #The below command Get-ADReplicationAttributeMetadata would work only in AD Server 2012 and above.Ignore the errors in other OS.            
+            $gPLinkMetadata = Get-ADReplicationAttributeMetadata -Server $Server -Object $SOM.distinguishedName -Properties gPLink
+
                     $order+=1
 					If ($SOM.gPLink.length -gt 1) {
 						$links = @($SOM.gPLink -split {$_ -eq '[' -or $_ -eq ']'} | Where-Object {$_}) 
@@ -74,11 +90,11 @@ Function Get-FullGPOInfo {
                             DistinguishedName = $SOM.distinguishedName
                             GUID              = $($GPOsHash[$($GPOData[2])].ID);
 							Depth             = $SOM.Depth;
-                            Precedence        = $links.count - $i #Depends on where it is
-							Config            = $GPOData[3];
-							LinkEnabled       = [bool](!([int]$GPOData[3] -band 1)); #Depends on where it is
-							Enforced          = [bool]([int]$GPOData[3] -band 2); #Depends on where it is 
-							BlockInheritance  = [bool]($SOM.gPOptions -band 1)    #Depends on OU where it is placed
+                            BlockInheritance  = [bool]($SOM.gPOptions -band 1)
+                            gPLinkVersion     = $gPLinkMetadata.Version
+                            gPLinkLastOrigChgTime = $gPLinkMetadata.LastOriginatingChangeTime
+                            gPLinkLastOrigChgDirServerId = $gPLinkMetadata.LastOriginatingChangeDirectoryServerIdentity
+                            gPLinkLastOrigChgDirServerInvocId = $gPLinkMetadata.LastOriginatingChangeDirectoryServerInvocationId
 							} 
 						}
 					} 
@@ -88,6 +104,10 @@ Function Get-FullGPOInfo {
                         Name              = $SOM.Name;
                         DistinguishedName = $SOM.distinguishedName;
 						BlockInheritance  = [bool]($SOM.gPOptions -band 1)
+                        gPLinkVersion     = $gPLinkMetadata.Version
+                        gPLinkLastOrigChgTime = $gPLinkMetadata.LastOriginatingChangeTime
+                        gPLinkLastOrigChgDirServerId = $gPLinkMetadata.LastOriginatingChangeDirectoryServerIdentity
+                        gPLinkLastOrigChgDirServerInvocId = $gPLinkMetadata.LastOriginatingChangeDirectoryServerInvocationId
 						}
 					}
            } 
@@ -101,8 +121,8 @@ Function Get-FullGPOInfo {
 			} 
 		}
         
-########################################################################################################################################################       
-        
+##########################################################################################################################################################################################################################################################        
+       
         $domain= Get-ADDomain
         ForEach ($path in $gpLinks)
 		{
@@ -164,7 +184,7 @@ Function Get-FullGPOInfo {
                         'Object Type'             = $_.ObjectType
                         'Inherited ObjectType'    = $_.InheritedObjectType
                         'Object Flags'            = $_.ObjectFlags
-                        'Audit Flags'             = $_.AuditFlags
+                        'Audit Flags'             = $_.AuditFlag
                         'Access Control Type'     = $_.AccessControlType
                         'Identity Reference'      = $_.Identityreference
                         'Is Inherited'            = $_.Isinherited
@@ -194,9 +214,13 @@ Function Get-FullGPOInfo {
                 'WMIFilter'          = $GPO.WmiFilter.name,$GPO.WmiFilter.Description 
                 'GPOPath'            = $GPO.Path 
                 'SOMPath'            = $path.distinguishedname
+                'gPLinkVersion'     = $report[$guidindex].gPLinkVersion
+                'gPLinkLastOrigChgTime' = $report[$guidindex].gPLinkLastOrigChgTime
+                'gPLinkLastOrigChgDirServerId' = $report[$guidindex].gPLinkLastOrigChgDirServerId
+                'gPLinkLastOrigChgDirServerInvocId' = $report[$guidindex].gPLinkLastOrigChgDirServerInvocId
                 'Permissions'        = $acl.Access | ForEach-Object -Process { 
                     New-Object -TypeName PSObject -Property @{ 
-                        'ActiveDirectory Rights'  = $_.ActiveDirectoryRights
+                        'ActiveDirectorRights'  = $_.ActiveDirectoryRights
                         'Inheritance Type'        = $_.InheritanceType
                         'Object Type'             = $_.ObjectType
                         'Inherited ObjectType'    = $_.InheritedObjectType
@@ -207,8 +231,8 @@ Function Get-FullGPOInfo {
                         'Inheritance Flags'       = $_.InheritanceFlags
                         'Propogation Flags'       = $_.Propogationflags
 
-                    } 
-                } 
+                    }
+                }
             }
              
         } }
@@ -244,6 +268,10 @@ Function Get-FullGPOInfo {
                 'WMIFilter'          = "" 
                 'GPOPath'            = "" 
                 'SOMPath'            = $path.distinguishedname
+                'gPLinkVersion'     = ""
+                'gPLinkLastOrigChgTime' = ""
+                'gPLinkLastOrigChgDirServerId' = ""
+                'gPLinkLastOrigChgDirServerInvocId' = ""
                 'Permissions'        = "" 
             }
 			
@@ -252,4 +280,5 @@ Function Get-FullGPOInfo {
     } 
  
 }}
-Get-FullGpoinfo | Select-Object SOM,SOMpath,SortOrder,Depth,Name,GUID,GPOpath,LinkEnabled,Enforced,Precedence,BlockInheritance,Linksto,CreationTime,ModificationTime,GPOStatus,HasComputerSettings,ComputerSettings,ComputerEnabled,HasUserSettings,UserSettings,UserEnabled,Wmifilter,Permissions,SDDL,SACL| Sort-Object SortOrder,Precedence | Out-GridView
+Get-FullGpoinfo | Select-Object SOM,SOMpath,SortOrder,Depth,Name,GUID,GPOpath,LinkEnabled,Enforced,Precedence,BlockInheritance,Linksto,CreationTime,ModificationTime,GPOStatus,HasComputerSettings,ComputerSettings,ComputerEnabled,HasUserSettings,UserSettings,UserEnabled,Wmifilter,gPLinkVersion,gPLinkLastOrigChgTime,gPLinkLastOrigChgDirServerId,gPLinkLastOrigChgDirServerInvocId,Permissions,SDDL,SACL| Sort-Object SortOrder,Precedence | Out-GridView
+
