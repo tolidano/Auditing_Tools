@@ -29,9 +29,16 @@ Function Get-FullGPOInfo {
     } 
  
     Process{ 
+$schemaIDGUID = @{}
+    $ErrorActionPreference = 'SilentlyContinue'
+Get-ADObject -SearchBase (Get-ADRootDSE).schemaNamingContext -LDAPFilter '(schemaIDGUID=*)' -Properties name, schemaIDGUID |
+ ForEach-Object {$schemaIDGUID.add([System.GUID]$_.schemaIDGUID,$_.name)}
+Get-ADObject -SearchBase "CN=Extended-Rights,$((Get-ADRootDSE).configurationNamingContext)" -LDAPFilter '(objectClass=controlAccessRight)' -Properties name, rightsGUID |
+ ForEach-Object {$schemaIDGUID.add([System.GUID]$_.rightsGUID,$_.name)}
+$ErrorActionPreference = 'Continue'
 
 ########################################################################################################################################################################################################################################################
-
+        $Server=$DomainName
 		Function Get-ADOrganizationalUnitOneLevel {
 		param($Path)
 			Get-ADOrganizationalUnit -Filter * -SearchBase $Path `
@@ -77,9 +84,11 @@ Function Get-FullGPOInfo {
 		ForEach ($SOM in $gPLinks) {
 			If ($SOM.gPLink) {
 
-            #The below command Get-ADReplicationAttributeMetadata would work only in AD Server 2012 and above.Ignore the errors in other OS.            
+            #The below command Get-ADReplicationAttributeMetadata would work only in AD Server 2012 and above.Ignore the errors in other OS. 
+            $gPLinkMetadata=@()           
+            if ((Get-CimInstance Win32_OperatingSystem).version -ge 6.2){
             $gPLinkMetadata = Get-ADReplicationAttributeMetadata -Server $Server -Object $SOM.distinguishedName -Properties gPLink
-
+            }
                     $order+=1
 					If ($SOM.gPLink.length -gt 1) {
 						$links = @($SOM.gPLink -split {$_ -eq '[' -or $_ -eq ']'} | Where-Object {$_}) 
@@ -151,7 +160,7 @@ Function Get-FullGPOInfo {
             $sm=  $report[$ouindex].Name.PadLeft($report[$ouindex].name.length + ($report[$ouindex].depth * 5),'_')             
             
 
-            $gpinheritance=(Get-GPInheritance -path $path.distinguishedname).gpolinks
+            $gpinheritance=(Get-GPInheritance -path $path.distinguishedname).gpolinks 
 			if ($gpinheritance -ne {}){
         ForEach($GP in $gpinheritance){ 
 			
@@ -176,6 +185,7 @@ Function Get-FullGPOInfo {
                 
                 'Depth'              = $report[$ouindex].Depth
                 'Description'        = $GPO.Description
+                'Owner'              = $GPO.Owner
                 'Precedence'         = $guid.order
                 'SACL'               = $sacl | ForEach-Object -Process { 
                     New-Object -TypeName PSObject -Property @{ 
@@ -191,8 +201,11 @@ Function Get-FullGPOInfo {
                         'Inheritance Flags'       = $_.InheritanceFlags
                         'Propogation Flags'       = $_.Propogationflags
 
-                    } 
                     }
+                    } | Select-Object  `
+                   @{name='objectTypeName';expression={if ($_.objectType.ToString() -eq '00000000-0000-0000-0000-000000000000') {'All'} Else {$schemaIDGUID.Item($_.objectType)}}}, `
+                   @{name='inheritedObjectTypeName';expression={$schemaIDGUID.Item($_.inheritedObjectType)}}, `
+                   * | Out-String
                 'SortOrder'          = $sortedous[$path.distinguishedname]               
                 'LinkEnabled'        = $guid.Enabled
                 'Enforced'           = $guid.Enforced
@@ -204,7 +217,7 @@ Function Get-FullGPOInfo {
                 'UserSettings'       = $UserSettings 
                 'UserVersion'        = "DSVersion: $($GPO.User.DSVersion);SysVolVersion: $($GPO.User.SysVolVersion)"
                 'ComputerVersion'    = "DSVersion: $($GPO.Computer.DSVersion);SysVolVersion: $($GPO.Computer.SysVolVersion)"
-                'SDDL'               = $XmlGPReport.GPO.SecurityDescriptor.SDDL.'#text'
+                #'SDDL'               = $XmlGPReport.GPO.SecurityDescriptor.SDDL.'#text'
                 'UserEnabled'        = $XmlGPReport.GPO.User.Enabled 
                 'ComputerEnabled'    = $XmlGPReport.GPO.Computer.Enabled 
                 'HasComputerSettings'= $ComputerSettingsConfigured 
@@ -213,28 +226,17 @@ Function Get-FullGPOInfo {
                 'ModificationTime'   = $GPO.ModificationTime 
                 'GpoStatus'          = $GPO.GpoStatus 
                 'GUID'               = $GPO.Id 
-                'WMIFilter'          = $GPO.WmiFilter.name,$GPO.WmiFilter.Description 
+                'WMIFilter'          = $GPO.WmiFilter.name,$GPO.WmiFilter.Description | Out-String
                 'GPOPath'            = $GPO.Path 
                 'SOMPath'            = $path.distinguishedname
                 'gPLinkVersion'     = $report[$guidindex].gPLinkVersion
                 'gPLinkLastOrigChgTime' = $report[$guidindex].gPLinkLastOrigChgTime
                 'gPLinkLastOrigChgDirServerId' = $report[$guidindex].gPLinkLastOrigChgDirServerId
                 'gPLinkLastOrigChgDirServerInvocId' = $report[$guidindex].gPLinkLastOrigChgDirServerInvocId
-                'Permissions'        = $acl.Access | ForEach-Object -Process { 
-                    New-Object -TypeName PSObject -Property @{ 
-                        'ActiveDirectorRights'  = $_.ActiveDirectoryRights
-                        'Inheritance Type'        = $_.InheritanceType
-                        'Object Type'             = $_.ObjectType
-                        'Inherited ObjectType'    = $_.InheritedObjectType
-                        'Object Flags'            = $_.ObjectFlags
-                        'Access Control Type'     = $_.AccessControlType
-                        'Identity Reference'      = $_.Identityreference
-                        'Is Inherited'            = $_.Isinherited
-                        'Inheritance Flags'       = $_.InheritanceFlags
-                        'Propogation Flags'       = $_.Propogationflags
-
-                    }
-                }
+                'DACL'        = $acl.Access | Select-Object  `
+                   @{name='objectTypeName';expression={if ($_.objectType.ToString() -eq '00000000-0000-0000-0000-000000000000') {'All'} Else {$schemaIDGUID.Item($_.objectType)}}}, `
+                   @{name='inheritedObjectTypeName';expression={$schemaIDGUID.Item($_.inheritedObjectType)}}, `
+                   * | Out-String
             }
              
         } }
@@ -248,6 +250,8 @@ Function Get-FullGPOInfo {
                 
                 'Depth'              = $report[$ouindex].Depth
                 'Precedence'         = ""
+                'Description'        = $GPO.Description
+                'Owner'              = $GPO.Owner
                 'SortOrder'           =$sortedous[$path.distinguishedname]               
                 'LinkEnabled'        = ""
                 'SACL'               = ""
@@ -276,7 +280,7 @@ Function Get-FullGPOInfo {
                 'gPLinkLastOrigChgTime' = ""
                 'gPLinkLastOrigChgDirServerId' = ""
                 'gPLinkLastOrigChgDirServerInvocId' = ""
-                'Permissions'        = "" 
+                'DACL'        = "" 
             }
 			
 						
@@ -284,5 +288,5 @@ Function Get-FullGPOInfo {
     } 
  
 }}
-Get-FullGpoinfo | Select-Object SOM,SOMpath,SortOrder,Depth,Name,GUID,GPOpath,LinkEnabled,Enforced,Precedence,BlockInheritance,Linksto,CreationTime,ModificationTime,GPOStatus,HasComputerSettings,ComputerSettings,ComputerEnabled,ComputerVersion,HasUserSettings,UserSettings,UserEnabled,UserVersion,Wmifilter,gPLinkVersion,gPLinkLastOrigChgTime,gPLinkLastOrigChgDirServerId,gPLinkLastOrigChgDirServerInvocId,Permissions,SDDL,SACL| Sort-Object SortOrder,Precedence | Out-GridView
+Get-FullGpoinfo | Select-Object SOM,SOMpath,SortOrder,Depth,Name,Description,GUID,GPOpath,LinkEnabled,Enforced,Precedence,BlockInheritance,Linksto,CreationTime,ModificationTime,GPOStatus,Owner,ComputerSettings,ComputerVersion,UserSettings,UserVersion,Wmifilter,DACL,SACL| Sort-Object SortOrder,Precedence | Export-CSV GPOExport.csv
 
