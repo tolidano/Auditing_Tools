@@ -18,25 +18,8 @@ Source :
 1. https://gallery.technet.microsoft.com/scriptcenter/Get-GPO-informations-b02e0fdf
 2. https://gallery.technet.microsoft.com/PowerShell-Script-to-eed7188a
 3. https://gallery.technet.microsoft.com/Forensics-Audit-Group-f9c57a1d
+4. https://gallery.technet.microsoft.com/Active-Directory-OU-1d09f989t
 
-
-Quick Reference One-Liner Commands
-----------------------------------
-Note: This section will be updated as and when I find any one liner commands being useful in my audit journey.
-
-1. Extract all GPO Reports to one html/xml file
-
-   Get-GPOReport -All -Reporttype < html / XML> | Out-File <Path_of_the_Output_File>
-
-2. Extract all AD Objects from the root domain with attributes
-
-   i. csvde -f output.csv (Outputs the entire AD Objects with all the properties/ attributes to a csv file, heavy on AD Server)
-
-   ii. dsquery * domainroot -attr samaccountname samaccounttype description useraccountcontrol whenCreated whenchanged accountexpires lastlogon lastlogontimestamp lastlogoff memberof –limit 0 > Userlist.txt (Outputs the entire AD Objects to a csv file, heavy on AD Server)
-
-   Note:- 
-        There are many attributes that can be used with the above dsquery command. Find the list of supported attributes in the below link :-
-        https://pastebin.com/mYD1Qk0L
 
 
 
