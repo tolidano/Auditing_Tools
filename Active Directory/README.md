@@ -6,11 +6,13 @@ Disclaimer :
 
 Most of the scripts here are not written by me and has been collated and uploaded here from various online sources for easy reference and use. Original source links has been given wherever applicable.
 
+The scripts are very dirty, code wise and have not been optimized and has been compiled just to get the work done. Hence expect some delay times during execution.
+
 Get-FullGPOInfo 
 ---------------
 This script extracts all the Metadata of all existing GPOs in a domain controller.
 
-This script consists of codes from various online sources with little bit of customizations from my side for personal use. The original source of the scripts utilised in this , has been given below. The script is very dirty, code wise and has not been optimized and has been compiled just to get the work done. Hence expect some delay times during execution.
+This script consists of codes from various online sources with little bit of customizations from my side for personal use. The original source of the scripts utilised in this , has been given below. T
 
 Big thanks to AshleyMcGlone. This script is a major rip-off from his scripts related to GPOs. 
 
@@ -25,4 +27,8 @@ The details that are required to be exported can be edited in the last line of t
 
 Note: The script execution might prove to be heavy on server depending on the number of GPOs whose details to be queried and extracted.
 
+Get-AllWmiFiltersInfo
+---------------------
 
+The script exports the complete GPO details to the file "ExportWMIFilters.csv" in the same path from where the script is being run.
+The details that are required to be exported can be edited in the last line of the script.
