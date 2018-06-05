@@ -12,7 +12,7 @@ Get-FullGPOInfo
 ---------------
 This script extracts all the Metadata of all existing GPOs in a domain controller.
 
-This script consists of codes from various online sources with little bit of customizations from my side for personal use. The original source of the scripts utilised in this , has been given below. T
+This script consists of codes from various online sources with little bit of customizations from my side for personal use. The original source of the scripts utilised in this , has been given below.
 
 Big thanks to AshleyMcGlone. This script is a major rip-off from his scripts related to GPOs. 
 
