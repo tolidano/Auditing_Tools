@@ -25,6 +25,8 @@ Source :
 The script exports the complete GPO details to the file "ExportGPO.csv" in the same path from where the script is being run.
 The details that are required to be exported can be edited in the last line of the script.
 
+A sample report "Get-FullGPOInfo_SampleReport.csv" of the output of this comman has been uploaded for reference. Some cells might appear blank,but might have information inside it. One might have to expand the cell in some case to find the details inside. Hence do not go at the face value.
+
 Note: The script execution might prove to be heavy on server depending on the number of GPOs whose details to be queried and extracted.
 
 Get-AllWmiFiltersInfo
@@ -32,3 +34,5 @@ Get-AllWmiFiltersInfo
 
 The script exports the complete GPO details to the file "ExportWMIFilters.csv" in the same path from where the script is being run.
 The details that are required to be exported can be edited in the last line of the script.
+
+A sample report "Get-AllWmiFIltersInfo_SampleReport.csv" of the output of this comman has been uploaded for reference. Some cells might appear blank,but might have information inside it. One might have to expand the cell in some case to find the details inside. Hence do not go at the face value.
