@@ -1,5 +1,9 @@
 This folder consists of scripts that are used by me to audit Active Directory related controls.
 
+Check out my 2 part series blog on auditing Active Directory Group Policy at
+
+https://rams3sh.blogspot.com/2018/04/learning-from-field-understanding-and.html
+
 
 Disclaimer : 
 ------------
