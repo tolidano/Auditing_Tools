@@ -167,7 +167,7 @@ def generate_access_advisor_report():
                             return
 
                 iam_entity_queue.task_done()
-                logger.info("Report generation for IAM entity {} from profile {} completed.".format(arn, iam_entity_arn_detail['profile']))
+                logger.debug("Report generation for IAM entity {} from profile {} completed.".format(arn, iam_entity_arn_detail['profile']))
 
             # Sleeping for 10 seconds until IAM entities fill up
             logger.debug("IAM entity queue is empty and iam entity query worker(s) is/are running , going to sleep !!")
@@ -218,18 +218,19 @@ def get_access_advisor_report():
                         if response.get('IsTruncated'):
                             marker = response.get('Marker')
                             report['ServicesLastAccessed'] += response['ServicesLastAccessed']
+                        else:
+                            report['ServicesLastAccessed'] = response['ServicesLastAccessed']
 
                     else:
                         # Waiting for the report to complete
                         time.sleep(5)
-                if report['ServicesLastAccessed']:
-                    report_output_queue.put({'arn': report_gen_detail['arn'],
-                                              'entity_type': report_gen_detail['entity_type'],
-                                              'profile': report_gen_detail['profile'],
-                                               'access_advisor_report' : report['ServicesLastAccessed']
-                                             })
+                report_output_queue.put({'arn': report_gen_detail['arn'],
+                                          'entity_type': report_gen_detail['entity_type'],
+                                          'profile': report_gen_detail['profile'],
+                                           'access_advisor_report' : report['ServicesLastAccessed']
+                                         })
                 report_gen_job_queue.task_done()
-                logger.info("Report Output for IAM entity {} from profile {} completed.".format(report_gen_detail['arn'],
+                logger.debug("Report Output for IAM entity {} from profile {} completed.".format(report_gen_detail['arn'],
                                                                                                 report_gen_detail['profile']))
 
             # Sleeping for 10 seconds until report generation job fills up
@@ -241,41 +242,63 @@ def write_file(file_output=None):
     global iam_entity_report_get_complete
 
     out = open(file_output, 'w')
-    csv_columns = ['Account', 'AccountType', 'Arn','EntityType', 'ServiceName','ServiceNamespace',
-                   'LastAuthenticated', 'LastAuthenticatedRegion', 'LastAuthenticatedEntity', 'TotalAuthenticatedEntities']
+    csv_columns = ['Account',
+                   'AccountType',
+                   'Arn',
+                   'EntityType',
+                   'ServiceName',
+                   'ServiceNamespace',
+                   'LastAuthenticated',
+                   'LastAuthenticatedRegion',
+                   #'LastAuthenticatedEntity',
+                   #'TotalAuthenticatedEntities'
+                   ]
     writer = csv.DictWriter(out, fieldnames=csv_columns)
     writer.writeheader()
 
     while True:
         if iam_entity_report_get_complete and report_output_queue.empty():
-            logger.info("All report has been taken is complete and queue is empty, I am done :) !!")
+            logger.info("All report has been taken and queue is empty, I am done :) !!")
             break
         else:
             while not report_output_queue.empty():
-                logger.error("Report generation queue is not empty, Starting to work !!")
+                logger.info("Report output queue is not empty, Starting to work !!")
                 record = report_output_queue.get()
                 if record['profile'].lower().__contains__("staging"):
                     account_type = "Non-Production"
                 else:
                     account_type = "Production"
 
-                for service in record['access_advisor_report']:
+                if record['access_advisor_report']:
+                    for service in record['access_advisor_report']:
 
+                        writer.writerow({'Account': record['profile'],
+                                         'AccountType': account_type,
+                                         'Arn': record['arn'],
+                                         'EntityType': record['entity_type'],
+                                         'ServiceName': service.get('ServiceName'),
+                                         'ServiceNamespace': service.get('ServiceNamespace'),
+                                         'LastAuthenticated': service.get('LastAuthenticated'),
+                                         'LastAuthenticatedRegion': service.get('LastAuthenticatedRegion'),
+                                        #'LastAuthenticatedEntity': service.get('LastAuthenticatedEntity'),
+                                        #'TotalAuthenticatedEntities': service.get('TotalAuthenticatedEntities')
+                                         })
+                else:
                     writer.writerow({'Account': record['profile'],
                                      'AccountType': account_type,
                                      'Arn': record['arn'],
                                      'EntityType': record['entity_type'],
-                                     'ServiceName': service['ServiceName'],
-                                     'ServiceNamespace': service['ServiceNamespace'],
-                                     'LastAuthenticated': service.get('LastAuthenticated'),
-                                     'LastAuthenticatedRegion': service.get('LastAuthenticatedRegion'), # This is optional
-                                     'LastAuthenticatedEntity': service.get('LastAuthenticatedEntity'),
-                                     'TotalAuthenticatedEntities': service.get('TotalAuthenticatedEntities')
+                                     'ServiceName': None,
+                                     'ServiceNamespace': None,
+                                     'LastAuthenticated': None,
+                                     'LastAuthenticatedRegion': None,
+                                     #'LastAuthenticatedEntity': None,
+                                     #'TotalAuthenticatedEntities': None
                                      })
-                logger.debug("Entry recorded for arn {} from profile {}".format(record['arn'],
-                                                                                record['profile']))
-                report_output_queue.task_done()
 
+                report_output_queue.task_done()
+                logger.info("Entry recorded for arn {} from profile {}".format(record['arn'],
+                                                                               record['profile']))
             # Sleeping for 10 seconds until report generation job fills up
             logger.debug(
                 "Report output queue is empty and report getting worker(s) is/are running , going to sleep !!")
