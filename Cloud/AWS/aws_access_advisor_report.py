@@ -415,4 +415,4 @@ if __name__ == "__main__":
 
     # Argument , profile , workers
     start(profiles=["default"],
-          worker_count=None, out_file='output.txt')
+          worker_count=None, out_file='access_advisor_report.csv')
