@@ -19,7 +19,7 @@ FORMAT = "%(asctime)s — %(relativeCreated)6d — %(threadName)s — %(name)s �
 logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.INFO)
 
-# AWS Configuration to escape throttling
+# aws Configuration to escape throttling
 config = Config(
    retries = {
                 'max_attempts': 10,
