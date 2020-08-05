@@ -6,6 +6,7 @@ import time
 import boto3
 import logging
 import csv
+import traceback
 
 # Queues
 profile_queue = Queue()
@@ -16,8 +17,8 @@ report_output_queue = Queue()
 # Logging
 logger =logging.getLogger(__name__)
 FORMAT = "%(asctime)s — %(relativeCreated)6d — %(threadName)s — %(name)s — %(levelname)s — %(funcName)s:%(lineno)d — %(message)s"
-logging.basicConfig(format=FORMAT)
-logger.setLevel(logging.INFO)
+logging.basicConfig(filename="access_advisor-"+str(time.time())+".log", format=FORMAT)
+logger.setLevel(logging.DEBUG)
 
 # aws Configuration to escape throttling
 config = Config(
@@ -105,10 +106,12 @@ def get_iam_entities_arns():
                                                         "SlowDown",
                                                         "EC2ThrottledException"]:
                     logger.error("Encountered Error: {} !! Sleeping for 20 seconds".format(error.response['Error']['Code']))
+                    logger.info(traceback.format_exc())
                     time.sleep(20)
                 else:
                     logger.error("Encountered Error: {} !! Exiting .. ".format(error.response['Error']['Code']))
-                    return
+                    logger.info(traceback.format_exc())
+                    logger.error("Omitted the processing for profile :{}".format(profile))
         profile_queue.task_done()
         logger.info("IAM entity query for profile {} done!!".format(profile))
     logger.info("No more profiles to process !!")
@@ -118,10 +121,22 @@ def generate_access_advisor_report():
     global iam_entity_queue
     global report_gen_job_queue
     global iam_entity_query_complete
+    global report_output_queue
 
     while True:
-        if iam_entity_query_complete and iam_entity_queue.empty():
-            logger.info("IAM entity query is complete and IAM entity queue is empty, I am done :) !!")
+        if iam_entity_query_complete and iam_entity_queue.empty() and report_output_queue.empty() and report_gen_job_queue.empty():
+            # This check sees whether there is any more processing to be done from the queue of iam entity query
+            # and whether the queue of get report is empty (in case anything exists ,
+            # it might be a potential candidate for report re-generation) and if the generation queue is empty. If not, it
+            #  may later become a potential candidate for re-generation of report.
+            # There is an edge case, where if get report is processing an entity (probably the last one in the queue)
+            # currently but all iam entity queue , report gen queue and report get queue is empty (currently while processing of the lat entity),
+            # then if the last entity is failure candidate , it could be missed from regeneration as gen thread would be dead by then.
+            # To handle it , the iam_entity_queue will be emptied at the end and given as an error log for debugging later.
+            # This cold be however handled just before the exit by re-writing the same processing code.
+            # However, leaving it since this is a very rare edge case.
+            logger.info("IAM entity query is complete and IAM entity queue is empty,"
+                        "and there seems to be no issue with getting reports of the entities for re-generation, I am done :) !!")
             break
         else:
             logger.debug("Starting to work on report generation !!")
@@ -161,10 +176,13 @@ def generate_access_advisor_report():
                                                                 "SlowDown",
                                                                 "EC2ThrottledException"]:
                             logger.error("Encountered Error: {} !! Sleeping for 20 seconds".format(error.response['Error']['Code']))
+                            logger.info(traceback.format_exc())
                             time.sleep(20)
                         else:
                             logger.error("Encountered Error: {} !! Exiting .. ".format(error.response['Error']['Code']))
-                            return
+                            logger.info(traceback.format_exc())
+                            logger.error("Omitted the report generation for arn {} and profile {}".format(arn,iam_entity_arn_detail['profile'] ))
+                            break
 
                 iam_entity_queue.task_done()
                 logger.debug("Report generation for IAM entity {} from profile {} completed.".format(arn, iam_entity_arn_detail['profile']))
@@ -196,34 +214,63 @@ def get_access_advisor_report():
                 report['ServicesLastAccessed'] = []
 
                 while response is None or response.get('IsTruncated'):
-
-                    if marker is None:
-                        response = iam_client.get_service_last_accessed_details(JobId=job_id)
-                    else:
-                        response = iam_client.get_service_last_accessed_details(JobId=job_id, Marker=marker)
-
-                    if response.get('JobStatus') == "FAILED" or response.get('Error'):
-                        # If report fails , this will add it up as a new task for generating a new report
-                        logger.warning("Report Generation job {} for arn {} and profile {} failed or met with an error. "
-                                       "IAM entity pushed to queue for report regeneration".format(job_id,
-                                                                                                   report_gen_detail['arn'],
-                                                                                                   report_gen_detail['profile']))
-                        iam_entity_queue.put({'arn': report_gen_detail['arn'],
-                                              'entity_type': report_gen_detail['entity_type'],
-                                              'profile': report_gen_detail['profile'],
-                                              'iam_client': iam_client})
-                        break
-
-                    if response.get('JobStatus') == "COMPLETED":
-                        if response.get('IsTruncated'):
-                            marker = response.get('Marker')
-                            report['ServicesLastAccessed'] += response['ServicesLastAccessed']
+                    try:
+                        if marker is None:
+                            response = iam_client.get_service_last_accessed_details(JobId=job_id)
                         else:
-                            report['ServicesLastAccessed'] = response['ServicesLastAccessed']
+                            response = iam_client.get_service_last_accessed_details(JobId=job_id, Marker=marker)
 
-                    else:
-                        # Waiting for the report to complete
-                        time.sleep(5)
+                        if response.get('JobStatus') == "FAILED" or response.get('Error'):
+                            # If report fails , this will add it up as a new task for generating a new report
+                            logger.warning("Report Generation job {} for arn {} and profile {} failed or met with an error. "
+                                           "IAM entity pushed to queue for report regeneration".format(job_id,
+                                                                                                       report_gen_detail['arn'],
+                                                                                                       report_gen_detail['profile']))
+                            iam_entity_queue.put({'arn': report_gen_detail['arn'],
+                                                  'entity_type': report_gen_detail['entity_type'],
+                                                  'profile': report_gen_detail['profile'],
+                                                  'iam_client': iam_client})
+                            break
+
+                        if response.get('JobStatus') == "COMPLETED":
+                            if response.get('IsTruncated'):
+                                marker = response.get('Marker')
+                                report['ServicesLastAccessed'] += response['ServicesLastAccessed']
+                            else:
+                                report['ServicesLastAccessed'] = response['ServicesLastAccessed']
+
+                        else:
+                            # Waiting for the report to complete
+                            time.sleep(5)
+                    except awsClientError as error:
+                        if error.response['Error']['Code'] in [ "RequestTimeout",
+                                                                "RequestTimeoutException",
+                                                                "PriorRequestNotComplete",
+                                                                "ConnectionError",
+                                                                "HTTPClientError",
+                                                                "Throttling",
+                                                                "ThrottlingException",
+                                                                "ThrottledException",
+                                                                "RequestThrottledException",
+                                                                "TooManyRequestsException",
+                                                                "ProvisionedThroughputExceededException",
+                                                                "TransactionInProgressException",
+                                                                "RequestLimitExceeded",
+                                                                "BandwidthLimitExceeded",
+                                                                "LimitExceededException",
+                                                                "RequestThrottled",
+                                                                "SlowDown",
+                                                                "EC2ThrottledException"]:
+                            logger.error("Encountered Error: {} !! Sleeping for 20 seconds".format(error.response['Error']['Code']))
+                            logger.debug(traceback.format_exc())
+                            time.sleep(20)
+                        else:
+                            logger.error("Encountered Error: {} !! Exiting .. ".format(error.response['Error']['Code']))
+                            logger.debug(traceback.format_exc())
+                            logger.error("Omitted getting the report for arn {} and profile {}".format(report_gen_detail['arn'],
+                                                                                                       report_gen_detail['profile']))
+                            break
+
                 report_output_queue.put({'arn': report_gen_detail['arn'],
                                           'entity_type': report_gen_detail['entity_type'],
                                           'profile': report_gen_detail['profile'],
@@ -262,7 +309,7 @@ def write_file(file_output=None):
             break
         else:
             while not report_output_queue.empty():
-                logger.info("Report output queue is not empty, Starting to work !!")
+                logger.debug("Report output queue is not empty, Starting to work !!")
                 record = report_output_queue.get()
                 if record['profile'].lower().__contains__("staging"):
                     account_type = "Non-Production"
@@ -394,8 +441,18 @@ def start(profiles=None, worker_count=None, out_file=None):
                 logger.debug("Query Workers are done !! File writing worker is still busy working !! Going to sleep !! ")
                 time.sleep(10)
             else:
-                logger.info("Operation Complete :) !!")
-                break
+                # This check catches one edge case.
+                if iam_entity_queue.empty() and report_gen_job_queue.empty() and report_output_queue.empty():
+                    logger.info("Operation Complete :) !!")
+                else:
+                    logger.error("There were some elements missed from processing probably due to sync issues. Likely chances being these "
+                                 "candidates would have been under process by get report, when gen report would have made check for empty get report queue before exiting !!")
+                    while iam_entity_queue.empty():
+                        iam_entity_details = iam_entity_queue.get()
+                        logger.error("Missed processing this arn {} from profile {}".format(iam_entity_details['arn'],
+                                                                                            iam_entity_details['profile']))
+                        iam_entity_queue.task_done()
+
 
 
 # Disclaimer
@@ -404,6 +461,10 @@ def start(profiles=None, worker_count=None, out_file=None):
 
 if __name__ == "__main__":
 
+    with open('profiles', 'r') as file_in:
+        content = file_in.readlines()
+
+    profiles = [profile.replace("\n","") for profile in content]
     # Argument , profile , workers
-    start(profiles=["default"],
+    start(profiles=profiles,
           worker_count=None, out_file='access_advisor_report.csv')

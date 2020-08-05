@@ -251,7 +251,7 @@ def start(profiles=None, worker_count=None, out_file=None):
     else:
         # By default assigning 2 workers for zone
         for each in range(2):
-            worker = Thread(target=get_hosted_zones, )
+            worker = Thread(targeant=get_hosted_zones, )
             worker.setDaemon(True)
             worker.start()
             zone_workers.append(worker)
