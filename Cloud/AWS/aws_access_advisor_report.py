@@ -325,22 +325,14 @@ def start(profiles=None, worker_count=None, out_file=None):
 
     # Initiate IAM Entity Workers
     logger.info("Initiating workers for IAM Entity querying !! ")
-    if len(profiles) == 1:
+    for each in range(1):
         worker = Thread(target=get_iam_entities_arns)
         worker.setDaemon(True)
         worker.start()
         iam_entity_query_workers.append(worker)
-    else:
-        # By default assigning 2 workers for zone
-        for each in range(2):
-            worker = Thread(target=get_iam_entities_arns)
-            worker.setDaemon(True)
-            worker.start()
-            iam_entity_query_workers.append(worker)
     logger.debug("Completed initiation of  workers for IAM Entity querying !! ")
 
     # Initiating the Report Generation Workers
-    # By default assigning 2 workers for Report Generation
     logger.info("Initiating workers for report generation !! ")
     for each in range(1):
         worker = Thread(target=generate_access_advisor_report)
@@ -350,9 +342,8 @@ def start(profiles=None, worker_count=None, out_file=None):
     logger.debug("Completed initiation of workers for report generation !! ")
 
     # Initiating the Workers for getting the report
-    # By default assigning 2 workers for getting the report
     logger.info("Initiating workers for getting the report !! ")
-    for each in range(2):
+    for each in range(1):
         worker = Thread(target=get_access_advisor_report)
         worker.setDaemon(True)
         worker.start()
