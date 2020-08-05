@@ -452,6 +452,7 @@ def start(profiles=None, worker_count=None, out_file=None):
                         logger.error("Missed processing this arn {} from profile {}".format(iam_entity_details['arn'],
                                                                                             iam_entity_details['profile']))
                         iam_entity_queue.task_done()
+                break
 
 
 
