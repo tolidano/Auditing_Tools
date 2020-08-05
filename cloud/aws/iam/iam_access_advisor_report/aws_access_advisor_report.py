@@ -130,17 +130,20 @@ def generate_access_advisor_report():
             # it might be a potential candidate for report re-generation) and if the generation queue is empty. If not, it
             #  may later become a potential candidate for re-generation of report.
             # There is an edge case, where if get report is processing an entity (probably the last one in the queue)
-            # currently but all iam entity queue , report gen queue and report get queue is empty (currently while processing of the lat entity),
-            # then if the last entity is failure candidate , it could be missed from regeneration as gen thread would be dead by then.
+            # currently but all iam entity queue , report gen queue and report get queue is empty (currently while processing of the last entity),
+            # then if the last entity(ies) is failure candidate for report get, it could be missed from regeneration as gen report thread would be dead by then.
             # To handle it , the iam_entity_queue will be emptied at the end and given as an error log for debugging later.
-            # This cold be however handled just before the exit by re-writing the same processing code.
+            # This could be however handled just before the exit by re-writing the same processing code.
             # However, leaving it since this is a very rare edge case.
             logger.info("IAM entity query is complete and IAM entity queue is empty,"
                         "and there seems to be no issue with getting reports of the entities for re-generation, I am done :) !!")
             break
         else:
-            logger.debug("Starting to work on report generation !!")
+            if iam_entity_query_complete and iam_entity_queue.empty():
+                logger.info("I am done , waiting further to handle only report re-generation tasks from get report!!")
+
             while not iam_entity_queue.empty():
+                logger.debug("Starting to work on report generation !!")
                 job_id = None
                 iam_entity_arn_detail = iam_entity_queue.get()
                 iam_client = iam_entity_arn_detail['iam_client']
